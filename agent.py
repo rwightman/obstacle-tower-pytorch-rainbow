@@ -8,7 +8,7 @@ from model import DQN
 
 class Agent:
     def __init__(self, args, env):
-        self.action_space = env.action_space()
+        self.action_space = env.action_space
         self.atoms = args.atoms
         self.v_min = args.V_min
         self.v_max = args.V_max
@@ -20,6 +20,9 @@ class Agent:
         self.discount = args.discount
 
         self.online_net = DQN(args, self.action_space).to(device=args.device)
+        for m in self.online_net.modules():
+            print(m)
+
         if args.model and os.path.isfile(args.model):
             # Always load tensors onto CPU by default, will shift to GPU if necessary
             self.online_net.load_state_dict(torch.load(args.model, map_location='cpu'))
@@ -44,7 +47,7 @@ class Agent:
 
     # Acts with an ε-greedy policy (used for evaluation only)
     def act_e_greedy(self, state, epsilon=0.001):  # High ε can reduce evaluation scores drastically
-        return np.random.randint(0, self.action_space) if np.random.random() < epsilon else self.act(state)
+        return self.action_space.sample() if np.random.random() < epsilon else self.act(state)
 
     def learn(self, mem):
         # Sample transitions
@@ -58,16 +61,18 @@ class Agent:
             # Calculate nth next state probabilities
             pns = self.online_net(next_states)  # Probabilities p(s_t+n, ·; θonline)
             dns = self.support.expand_as(pns) * pns  # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
-            argmax_indices_ns = dns.sum(2).argmax(
-                1)  # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
+
+            # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
+            argmax_indices_ns = dns.sum(2).argmax(1)
             self.target_net.reset_noise()  # Sample new target net noise
             pns = self.target_net(next_states)  # Probabilities p(s_t+n, ·; θtarget)
-            pns_a = pns[range(
-                self.batch_size), argmax_indices_ns]  # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)
+
+            # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)
+            pns_a = pns[range(self.batch_size), argmax_indices_ns]
 
             # Compute Tz (Bellman operator T applied to z)
-            T_z = returns.unsqueeze(1) + nonterminals * (self.discount ** self.n) * self.support.unsqueeze(
-                0)  # Tz = R^n + (γ^n)z (accounting for terminal states)
+            # Tz = R^n + (γ^n)z (accounting for terminal states)
+            T_z = returns.unsqueeze(1) + nonterminals * (self.discount ** self.n) * self.support.unsqueeze(0)
             T_z = T_z.clamp(min=self.v_min, max=self.v_max)  # Clamp between supported values
 
             # Compute L2 projection of Tz onto fixed support z

@@ -3,6 +3,7 @@ import random
 import atari_py
 import cv2
 import torch
+import gym
 
 
 class AtariEnv:
@@ -22,6 +23,7 @@ class AtariEnv:
         self.window = args.history_length  # Number of frames to concatenate
         self.state_buffer = deque([], maxlen=args.history_length)
         self.training = True  # Consistent with model training mode
+        self.action_space = gym.spaces.Discrete(len(actions))
 
     def _get_state(self):
         state = cv2.resize(self.ale.getScreenGrayscale(), (84, 84), interpolation=cv2.INTER_LINEAR)
@@ -73,7 +75,7 @@ class AtariEnv:
                 done = True
             self.lives = lives
         # Return state, reward, done
-        return torch.stack(list(self.state_buffer), 0), reward, done
+        return torch.stack(list(self.state_buffer), 0), reward, done, {}
 
     # Uses loss of life as terminal signal
     def train(self):
@@ -83,7 +85,7 @@ class AtariEnv:
     def eval(self):
         self.training = False
 
-    def action_space(self):
+    def action_count(self):
         return len(self.actions)
 
     def render(self):

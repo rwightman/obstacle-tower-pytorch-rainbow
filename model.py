@@ -52,13 +52,13 @@ class DQN(nn.Module):
         self.action_space = action_space
         self.act_fn = act_fn
 
-        self.conv1 = nn.Conv2d(args.history_length, 32, 8, stride=4, padding=1)
+        self.conv1 = nn.Conv2d(3, 32, 8, stride=4, padding=1)
         self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
         self.conv3 = nn.Conv2d(64, 64, 3)
         self.fc_h_v = NoisyLinear(3136, args.hidden_size, std_init=args.noisy_std)
         self.fc_h_a = NoisyLinear(3136, args.hidden_size, std_init=args.noisy_std)
         self.fc_z_v = NoisyLinear(args.hidden_size, self.atoms, std_init=args.noisy_std)
-        self.fc_z_a = NoisyLinear(args.hidden_size, action_space * self.atoms, std_init=args.noisy_std)
+        self.fc_z_a = NoisyLinear(args.hidden_size, action_space.n * self.atoms, std_init=args.noisy_std)
 
     def forward(self, x, log=False):
         x = self.act_fn(self.conv1(x))
@@ -68,7 +68,7 @@ class DQN(nn.Module):
 
         v = self.fc_z_v(self.act_fn(self.fc_h_v(x)))  # Value stream
         a = self.fc_z_a(self.act_fn(self.fc_h_a(x)))  # Advantage stream
-        v, a = v.view(-1, 1, self.atoms), a.view(-1, self.action_space, self.atoms)
+        v, a = v.view(-1, 1, self.atoms), a.view(-1, self.action_space.n, self.atoms)
         q = v + a - a.mean(1, keepdim=True)  # Combine streams
 
         if log:  # Use log softmax for numerical stability

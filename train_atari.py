@@ -6,7 +6,7 @@ import torch
 from agent import Agent
 from atari_env import AtariEnv
 from memory import ReplayMemory
-from test_rainbow import test
+from test_atari import test
 from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='Rainbow')
