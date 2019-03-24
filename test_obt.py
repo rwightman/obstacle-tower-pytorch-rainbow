@@ -7,26 +7,10 @@ import numpy as np
 
 import gym
 from obstacle_tower_env import ObstacleTowerEnv
+from env.wrappers import ToTorchTensors
 
 # Globals
 Ts, rewards, Qs, best_avg_reward = [], [], [], -1e10
-
-
-class ToTorchTensors(gym.ObservationWrapper):
-    def __init__(self, env=None, device='cpu'):
-        super(ToTorchTensors, self).__init__(env)
-        obs_shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(
-            self.observation_space.low[0, 0, 0],
-            self.observation_space.high[0, 0, 0],
-            [obs_shape[2], obs_shape[1], obs_shape[0]],
-            dtype=self.observation_space.dtype)
-        self.device = device
-
-    def observation(self, observation):
-        tensor = torch.from_numpy(np.rollaxis(observation, 2)).to(self.device)
-        tensor = tensor.float() / 127.5 - 1.0
-        return tensor
 
 
 # Test DQN
@@ -34,8 +18,6 @@ def test(args, T, dqn, val_mem, evaluate=False):
     global Ts, rewards, Qs, best_avg_reward
     env = ObstacleTowerEnv(args.environment_filename, docker_training=args.docker_training, worker_id=1)
     env = ToTorchTensors(env, device=args.device)
-
-    #env.eval()
 
     Ts.append(T)
     T_rewards, T_Qs = [], []
@@ -45,7 +27,9 @@ def test(args, T, dqn, val_mem, evaluate=False):
     for _ in range(args.evaluation_episodes):
         while True:
             if done:
-                state, reward_sum, done = env.reset(), 0, False
+                state = env.reset()
+                reward_sum = 0
+                done = False
 
             action = dqn.act_e_greedy(state)  # Choose an action ε-greedily
             state, reward, done, _ = env.step(action)  # Step

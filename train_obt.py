@@ -1,12 +1,10 @@
-from obstacle_tower_env import ObstacleTowerEnv
-
 import argparse
 from datetime import datetime
 import numpy as np
 import torch
-import sys
-import gym
 
+from env.env_obt import ObstacleTowerEnv
+from env.wrappers import ToTorchTensors
 from agent import Agent
 from memory import ReplayMemory
 from test_obt import test
@@ -15,7 +13,6 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser(description='Rainbow')
 parser.add_argument('--seed', type=int, default=123, help='Random seed')
 parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
-parser.add_argument('--game', type=str, default='space_invaders', help='ATARI game')
 parser.add_argument('--T-max', type=int, default=int(50e6), metavar='STEPS',
                     help='Number of training steps (4x number of frames)')
 parser.add_argument('--max-episode-length', type=int, default=int(108e3), metavar='LENGTH',
@@ -44,7 +41,7 @@ parser.add_argument('--reward-clip', type=int, default=1, metavar='VALUE', help=
 parser.add_argument('--lr', type=float, default=0.0000625, metavar='η', help='Learning rate')
 parser.add_argument('--adam-eps', type=float, default=1.5e-4, metavar='ε', help='Adam epsilon')
 parser.add_argument('--batch-size', type=int, default=32, metavar='SIZE', help='Batch size')
-parser.add_argument('--learn-start', type=int, default=int(50e3), metavar='STEPS',
+parser.add_argument('--learn-start', type=int, default=int(80e3), metavar='STEPS',
                     help='Number of steps before starting training')
 parser.add_argument('--evaluate', action='store_true', help='Evaluate only')
 parser.add_argument('--evaluation-interval', type=int, default=100000, metavar='STEPS',
@@ -57,23 +54,6 @@ parser.add_argument('--render', action='store_true', help='Display screen (testi
 parser.add_argument('environment_filename', default='./ObstacleTower/obstacletower', nargs='?')
 parser.add_argument('--docker_training', action='store_true')
 parser.set_defaults(docker_training=False)
-
-
-class ToTorchTensors(gym.ObservationWrapper):
-    def __init__(self, env=None, device='cpu'):
-        super(ToTorchTensors, self).__init__(env)
-        obs_shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(
-            self.observation_space.low[0, 0, 0],
-            self.observation_space.high[0, 0, 0],
-            [obs_shape[2], obs_shape[1], obs_shape[0]],
-            dtype=self.observation_space.dtype)
-        self.device = device
-
-    def observation(self, observation):
-        tensor = torch.from_numpy(np.rollaxis(observation, 2)).to(self.device)
-        tensor = 2 * (tensor.float() / 255 - 0.5)
-        return tensor
 
 
 def run_episode(env):
@@ -116,9 +96,7 @@ def main():
     # Environment
     env = ObstacleTowerEnv(args.environment_filename, docker_training=args.docker_training)
     env = ToTorchTensors(env, device=args.device)
-    #env.train()
     action_space = env.action_space
-    print(action_space.sample())
 
     # Agent
     dqn = Agent(args, env)
