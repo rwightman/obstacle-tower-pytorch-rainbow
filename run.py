@@ -1,5 +1,3 @@
-from obstacle_tower_env import ObstacleTowerEnv
-
 import argparse
 from datetime import datetime
 import numpy as np
@@ -7,7 +5,7 @@ import torch
 import sys
 
 from agent_eval import AgentEval
-from env.wrappers import ToTorchTensors
+from env import create_env
 
 
 def run_episode(env, agent):
@@ -65,8 +63,13 @@ def main():
         args.device = torch.device('cpu')
 
     # Environment
-    env = ObstacleTowerEnv(args.environment_filename, realtime_mode=False, worker_id=args.worker)
-    env = ToTorchTensors(env, device=args.device)
+    env = create_env(
+        args.environment_filename,
+        custom=False,
+        skip_frames=4,
+        realtime=args.render,
+        worker_id=args.worker,
+        device=args.device)
 
     agent = AgentEval(args, env)
 

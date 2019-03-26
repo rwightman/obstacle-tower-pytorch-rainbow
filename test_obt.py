@@ -5,22 +5,29 @@ from plotly.graph_objs.scatter import Line
 import torch
 import numpy as np
 
-import gym
-from obstacle_tower_env import ObstacleTowerEnv
-from env.wrappers import ToTorchTensors
+from env import create_env
 
 # Globals
 Ts, rewards, Qs, best_avg_reward = [], [], [], -1e10
 
 
 # Test DQN
-def test(args, T, dqn, val_mem, evaluate=False):
+def test(args, T, dqn, val_mem, skip_frames=4, evaluate=False, realtime=False):
     global Ts, rewards, Qs, best_avg_reward
-    env = ObstacleTowerEnv(args.environment_filename, docker_training=args.docker_training, worker_id=1)
-    env = ToTorchTensors(env, device=args.device)
+
+    env = create_env(
+        args.environment_filename,
+        custom=False,
+        skip_frames=skip_frames,
+        realtime=realtime,
+        docker=args.docker_training,
+        worker_id=1,
+        device=args.device
+    )
 
     Ts.append(T)
-    T_rewards, T_Qs = [], []
+    T_rewards = []
+    T_Qs = []
 
     # Test performance over several episodes
     done = True
@@ -46,7 +53,8 @@ def test(args, T, dqn, val_mem, evaluate=False):
     for state in val_mem:  # Iterate over valid states
         T_Qs.append(dqn.evaluate_q(state))
 
-    avg_reward, avg_Q = sum(T_rewards) / len(T_rewards), sum(T_Qs) / len(T_Qs)
+    avg_reward = sum(T_rewards) / len(T_rewards)
+    avg_Q = sum(T_Qs) / len(T_Qs)
     if not evaluate:
         # Append to results
         rewards.append(T_rewards)

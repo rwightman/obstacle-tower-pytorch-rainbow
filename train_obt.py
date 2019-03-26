@@ -3,8 +3,7 @@ from datetime import datetime
 import numpy as np
 import torch
 
-from env.env_obt import ObstacleTowerEnv
-from env.wrappers import ToTorchTensors
+from env import create_env
 from agent import Agent
 from memory import ReplayMemory
 from test_obt import test
@@ -56,23 +55,6 @@ parser.add_argument('--docker_training', action='store_true')
 parser.set_defaults(docker_training=False)
 
 
-def run_episode(env):
-    done = False
-    episode_reward = 0.0
-    
-    while not done:
-        action = env.action_space.sample()
-        obs, reward, done, info = env.step(action)
-        episode_reward += reward
-    return episode_reward
-
-
-def run_evaluation(env):
-    while not env.done_grading():
-        run_episode(env)
-        env.reset()
-
-
 # Simple ISO 8601 timestamped logger
 def log(s):
     print('[' + str(datetime.now().strftime('%Y-%m-%dT%H:%M:%S')) + '] ' + s)
@@ -94,8 +76,13 @@ def main():
         args.device = torch.device('cpu')
 
     # Environment
-    env = ObstacleTowerEnv(args.environment_filename, docker_training=args.docker_training)
-    env = ToTorchTensors(env, device=args.device)
+    env = create_env(
+        args.environment_filename,
+        custom=True,
+        skip_frames=4,
+        docker=args.docker_training,
+        device=args.device
+    )
     action_space = env.action_space
 
     # Agent
