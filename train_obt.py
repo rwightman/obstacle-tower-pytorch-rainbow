@@ -7,6 +7,7 @@ from env import create_env
 from agent import Agent
 from memory import ReplayMemory
 from test_obt import test
+from image_utils import random_augment_color
 from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='Rainbow')
@@ -76,31 +77,41 @@ def main():
         args.device = torch.device('cpu')
 
     # Environment
-    env = create_env(
+    train_env = create_env(
         args.environment_filename,
         custom=True,
-        skip_frames=4,
+        skip_frames=1,
+        random_aug=True,
         docker=args.docker_training,
         device=args.device
     )
-    action_space = env.action_space
+    action_space = train_env.action_space
+
+    test_env = create_env(
+        args.environment_filename,
+        custom=False,
+        skip_frames=1,
+        docker=args.docker_training,
+        device=args.device,
+        worker_id=1,
+    )
 
     # Agent
-    dqn = Agent(args, env)
-    mem = ReplayMemory(args, args.memory_capacity, obs_space=env.observation_space)
+    dqn = Agent(args, train_env)
+    mem = ReplayMemory(args, args.memory_capacity, obs_space=train_env.observation_space)
     priority_weight_increase = (1 - args.priority_weight) / (args.T_max - args.learn_start)
 
     # Construct validation memory
-    val_mem = ReplayMemory(args, args.evaluation_size, obs_space=env.observation_space)
+    val_mem = ReplayMemory(args, args.evaluation_size, obs_space=train_env.observation_space)
     time_step = 0
     done = True
     state = None
     while time_step < args.evaluation_size:
         if done:
-            state = env.reset()
+            state = train_env.reset()
             done = False
 
-        next_state, _, done, _ = env.step(action_space.sample())
+        next_state, _, done, _ = train_env.step(action_space.sample())
         val_mem.append(state, None, None, done)
         state = next_state
         time_step += 1
@@ -115,14 +126,14 @@ def main():
         done = True
         for time_step in tqdm(range(args.T_max)):
             if done:
-                state = env.reset()
+                state = train_env.reset()
                 done = False
 
             if time_step % args.replay_frequency == 0:
                 dqn.reset_noise()  # Draw a new set of noisy weights
 
             action = dqn.act(state)  # Choose an action greedily (with noisy weights)
-            next_state, reward, done, info = env.step(action)  # Step
+            next_state, reward, done, info = train_env.step(action)  # Step
             if args.reward_clip > 0:
                 reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
             mem.append(state, action, reward, done)  # Append transition to memory
@@ -138,7 +149,7 @@ def main():
 
                 if time_step % args.evaluation_interval == 0:
                     dqn.eval()  # Set DQN (online network) to evaluation mode
-                    avg_reward, avg_Q = test(args, time_step, dqn, val_mem)  # Test
+                    avg_reward, avg_Q = test(args, time_step, dqn, val_mem, env=test_env)  # Test
                     log('T = ' + str(time_step) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(
                         avg_reward) + ' | Avg. Q: ' + str(avg_Q))
                     dqn.train()  # Set DQN (online network) back to training mode
@@ -149,7 +160,7 @@ def main():
 
             state = next_state
 
-    env.close()
+    train_env.close()
 
 
 if __name__ == '__main__':

@@ -12,18 +12,24 @@ Ts, rewards, Qs, best_avg_reward = [], [], [], -1e10
 
 
 # Test DQN
-def test(args, T, dqn, val_mem, skip_frames=4, evaluate=False, realtime=False):
+def test(args, T, dqn, val_mem,
+         skip_frames=1, evaluate=False, realtime=False, env=None):
+
     global Ts, rewards, Qs, best_avg_reward
 
-    env = create_env(
-        args.environment_filename,
-        custom=False,
-        skip_frames=skip_frames,
-        realtime=realtime,
-        docker=args.docker_training,
-        worker_id=1,
-        device=args.device
-    )
+    if env is None:
+        env = create_env(
+            args.environment_filename,
+            custom=False,
+            skip_frames=skip_frames,
+            realtime=realtime,
+            docker=args.docker_training,
+            worker_id=1,
+            device=args.device
+        )
+        own_env = True
+    else:
+        own_env = False
 
     Ts.append(T)
     T_rewards = []
@@ -47,7 +53,9 @@ def test(args, T, dqn, val_mem, skip_frames=4, evaluate=False, realtime=False):
             if done:
                 T_rewards.append(reward_sum)
                 break
-    env.close()
+
+    if own_env:
+        env.close()
 
     # Test Q-values over validation memory
     for state in val_mem:  # Iterate over valid states
