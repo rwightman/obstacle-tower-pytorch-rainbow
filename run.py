@@ -17,7 +17,7 @@ def run_episode(env, agent):
             reward_sum = 0
             done = False
 
-        action = agent.act_e_greedy(state, epsilon=0.0001)  # Choose an action ε-greedily
+        action = agent.act_e_greedy(state, epsilon=0.0005)  # Choose an action ε-greedily
         state, reward, done, _ = env.step(action)  # Step
         reward_sum += reward
 
@@ -66,7 +66,7 @@ def main():
     env = create_env(
         args.environment_filename,
         custom=False,
-        skip_frames=4,
+        skip_frames=1,
         realtime=args.render,
         worker_id=args.worker,
         device=args.device)

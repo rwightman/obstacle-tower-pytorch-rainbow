@@ -137,7 +137,6 @@ def main():
             if args.reward_clip > 0:
                 reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
             mem.append(state, action, reward, done)  # Append transition to memory
-            time_step += 1
 
             # Train and test
             if time_step >= args.learn_start:
