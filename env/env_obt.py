@@ -22,8 +22,8 @@ logger = logging.getLogger("gym_unity")
 class CustomObstacleTowerEnv(gym.Env):
     ALLOWED_VERSIONS = ['1', '1.1', '1.2']
 
-    def __init__(self, environment_filename=None, docker_training=False, worker_id=0, retro=True,
-                 timeout_wait=30, realtime_mode=False):
+    def __init__(self, environment_filename=None, docker_training=False, worker_id=0, mode='retro',
+                 timeout_wait=30, realtime_mode=False, custom_reward=False):
         """
         Arguments:
           environment_filename: The file path to the Unity executable.  Does not require the extension.
@@ -69,7 +69,9 @@ class CustomObstacleTowerEnv(gym.Env):
         self._floor = None
         self.realtime_mode = realtime_mode
         self.game_over = False  # Hidden flag used by Atari environments to determine if the game is over
-        self.retro = retro
+        self.retro = 'retro' in mode
+        self.mode = mode
+        self.use_custom_reward = custom_reward
 
         flatten_branched = self.retro
         uint8_visual = self.retro
@@ -113,17 +115,25 @@ class CustomObstacleTowerEnv(gym.Env):
         image_space_dtype = np.float32
         camera_height = brain.camera_resolutions[0]["height"]
         camera_width = brain.camera_resolutions[0]["width"]
-        if self.retro:
+        if self.mode == 'retro':
             image_space_max = 255
             image_space_dtype = np.uint8
             camera_height = 84
             camera_width = 84
+        elif self.mode == 'retro_large':
+            image_space_max = 255
+            image_space_dtype = np.uint8
+            camera_height = 168
+            camera_width = 168
 
+        image_shape = (camera_height, camera_width, depth)
         image_space = spaces.Box(
             0, image_space_max,
             dtype=image_space_dtype,
-            shape=(camera_height, camera_width, depth)
+            shape=image_shape
         )
+        self._image_shape = image_shape
+        self._image_space = image_space
         if self.retro:
             self._observation_space = image_space
         else:
@@ -200,7 +210,7 @@ class CustomObstacleTowerEnv(gym.Env):
         self.visual_obs = self._preprocess_single(state.visual_observations[0][0, :, :, :])
 
         if self.retro:
-            self.visual_obs = self._resize_observation(self.visual_obs)
+            self.visual_obs = self._resize_observation(self.visual_obs, self._image_shape)
             self.visual_obs = self._add_stats_to_image(
                 self.visual_obs, state.vector_observations[0])
             default_observation = self.visual_obs
@@ -208,13 +218,18 @@ class CustomObstacleTowerEnv(gym.Env):
             default_observation = self._prepare_tuple_observation(
                 self.visual_obs, state.vector_observations[0])
 
-        base_reward = state.rewards[0]
-        custom_reward = self._custom_reward(state)
-
-        return default_observation, custom_reward, state.local_done[0], {
+        info = {
             "text_observation": state.text_observations[0],
             "brain_info": state,
-            "base_reward": base_reward}
+        }
+        base_reward = state.rewards[0]
+        if self.use_custom_reward:
+            reward = self._custom_reward(state)
+            info["base_reward"] = base_reward
+        else:
+            reward = base_reward
+
+        return default_observation, reward, state.local_done[0], info
 
     def _custom_reward(self, state):
         key_obs = state.vector_observations[0][0:6]
@@ -288,12 +303,14 @@ class CustomObstacleTowerEnv(gym.Env):
         self._floor = floor
 
     @staticmethod
-    def _resize_observation(observation):
+    def _resize_observation(observation, image_shape):
+        if observation.shape[:2] == image_shape[:2]:
+            return observation
         """
         Re-sizes visual observation to 84x84
         """
         obs_image = Image.fromarray(observation)
-        obs_image = obs_image.resize((84, 84), Image.NEAREST)
+        obs_image = obs_image.resize(image_shape[:2], Image.NEAREST)
         return np.array(obs_image)
 
     @staticmethod

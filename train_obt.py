@@ -76,12 +76,15 @@ def main():
     else:
         args.device = torch.device('cpu')
 
+    args.large = True
+
     # Environment
     train_env = create_env(
         args.environment_filename,
         custom=True,
-        skip_frames=1,
-        random_aug=True,
+        large=True,
+        skip_frames=2,
+        random_aug=0.4,
         docker=args.docker_training,
         device=args.device
     )
@@ -89,8 +92,10 @@ def main():
 
     test_env = create_env(
         args.environment_filename,
-        custom=False,
-        skip_frames=1,
+        custom=True,
+        large=True,
+        custom_reward=False,
+        skip_frames=2,
         docker=args.docker_training,
         device=args.device,
         worker_id=1,

@@ -3,7 +3,15 @@ import numpy as np
 import torch
 from torch import optim
 
-from model import DQN
+from model import DQN, ResDQN
+
+
+def create_model(args, action_space, device='cpu'):
+    if args.large:
+        net = ResDQN(args, action_space).to(device=device)
+    else:
+        net = DQN(args, action_space).to(device=device)
+    return net
 
 
 class Agent:
@@ -19,7 +27,7 @@ class Agent:
         self.n = args.multi_step
         self.discount = args.discount
 
-        self.online_net = DQN(args, self.action_space).to(device=args.device)
+        self.online_net = create_model(args, self.action_space, args.device)
         for m in self.online_net.modules():
             print(m)
 
@@ -28,7 +36,7 @@ class Agent:
             self.online_net.load_state_dict(torch.load(args.model, map_location='cpu'))
         self.online_net.train()
 
-        self.target_net = DQN(args, self.action_space).to(device=args.device)
+        self.target_net = create_model(args, self.action_space, args.device)
         self.update_target_net()
         self.target_net.train()
         for param in self.target_net.parameters():
