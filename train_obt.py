@@ -3,11 +3,10 @@ from datetime import datetime
 import numpy as np
 import torch
 
-from env import create_env
+from env import create_env, TimeoutMonitor
 from agent import Agent
 from memory import ReplayMemory
 from test_obt import test
-from image_utils import random_augment_color
 from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='Rainbow')
@@ -53,6 +52,7 @@ parser.add_argument('--evaluation-size', type=int, default=500, metavar='N',
 parser.add_argument('--render', action='store_true', help='Display screen (testing only)')
 parser.add_argument('environment_filename', default='./ObstacleTower/obstacletower', nargs='?')
 parser.add_argument('--docker_training', action='store_true')
+parser.add_argument('--timeout_monitor', action='store_true')
 parser.set_defaults(docker_training=False)
 
 
@@ -101,13 +101,18 @@ def main():
         worker_id=1,
     )
 
+    mem = ReplayMemory(args, args.memory_capacity, obs_space=train_env.observation_space)
+    val_mem = ReplayMemory(args, args.evaluation_size, obs_space=test_env.observation_space)
+
+    # for debugging environment issues
+    if args.timeout_monitor:
+        train_env = TimeoutMonitor(train_env, mem)
+        test_env = TimeoutMonitor(test_env, val_mem)
+
     # Agent
     dqn = Agent(args, train_env)
-    mem = ReplayMemory(args, args.memory_capacity, obs_space=train_env.observation_space)
-    priority_weight_increase = (1 - args.priority_weight) / (args.T_max - args.learn_start)
 
-    # Construct validation memory
-    val_mem = ReplayMemory(args, args.evaluation_size, obs_space=train_env.observation_space)
+    priority_weight_increase = (1 - args.priority_weight) / (args.T_max - args.learn_start)
     time_step = 0
     done = True
     state = None
