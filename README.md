@@ -1,6 +1,6 @@
 # Obstacle Tower Challenge - Rainbow & PyTorch
 
-This repo contains my starting point for Round 1 of the Obstacle Tower Challenge -- a clone of the [starters kit](https://github.com/Unity-Technologies/obstacle-tower-challenge) with Kaixhin's great implementation of Rainbow as my baseline RL algoirthm (https://github.com/Kaixhin/Rainbow).
+This repo contains my starting point for Round 1 of the Obstacle Tower Challenge -- a clone of the [starters kit](https://github.com/Unity-Technologies/obstacle-tower-challenge) with Kaixhin's great implementation of Rainbow as my baseline RL algorithm (https://github.com/Kaixhin/Rainbow).
 
 I hacked the rainbow impl to work with color images, unstacked frames. Created an env wrapper for allowing reward shaping, custom resolutions, and other changes.
 
