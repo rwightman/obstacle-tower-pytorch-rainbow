@@ -1,17 +1,23 @@
 import faulthandler
 import os
 import threading
+import time
 
 import gym
 from PIL import Image
 
 
 class TimeoutMonitor(gym.Wrapper):
+    """ Timeout Monitor for Environment lockup bug tracking
+    This class was created to work around/debug issues with the environment locking up while training
+    or evaluating.
+    """
     def __init__(self, env, memory):
         gym.Wrapper.__init__(self, env)
         self._memory = memory
         self._running = True
         self._waiting = False
+        self._killed = False
         self._timeout = 30
         self._output_dir = './'
         self._cv = threading.Condition()
@@ -28,6 +34,10 @@ class TimeoutMonitor(gym.Wrapper):
     def reset(self, **kwargs):
         self._set_waiting()
         result = self.env.reset(**kwargs)
+        if self._killed:
+            self._killed = False
+            time.sleep(45)
+            raise TimeoutError()
         self._clear_waiting()
         return result
 
@@ -62,8 +72,11 @@ class TimeoutMonitor(gym.Wrapper):
                 if not not_expired:
                     print('TIMEOUT!')
                     self._dump_memory()
-                    faulthandler.dump_traceback('./freeze-trace.txt')
-                    exit(1)
+                    with open('./freeze-trace.txt', "w+") as f:
+                        faulthandler.dump_traceback(f)
+                    self._killed = True
+                    self.unwrapped.proc1.kill()
+                    time.sleep(15)
 
     def _dump_memory(self, n=60):
         mem_start_idx = self._memory.transitions.index

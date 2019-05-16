@@ -6,7 +6,7 @@ from obstacle_tower_env import ObstacleTowerEnv
 def create_env(
         env_filename,
         custom=True, large=False, custom_reward=True,
-        skip_frames=4, docker=False, realtime=False, random_aug=0.,
+        skip_frames=0, docker=False, realtime=False, random_aug=0.,
         worker_id=0, device='cpu'
 ):
 

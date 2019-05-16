@@ -51,8 +51,8 @@ parser.add_argument('--evaluation-size', type=int, default=500, metavar='N',
                     help='Number of transitions to use for validating Q')
 parser.add_argument('--render', action='store_true', help='Display screen (testing only)')
 parser.add_argument('environment_filename', default='./ObstacleTower/obstacletower', nargs='?')
-parser.add_argument('--docker_training', action='store_true')
-parser.add_argument('--timeout_monitor', action='store_true')
+parser.add_argument('--docker-training', action='store_true')
+parser.add_argument('--timeout-monitor', action='store_true')
 parser.set_defaults(docker_training=False)
 
 
@@ -76,15 +76,17 @@ def main():
     else:
         args.device = torch.device('cpu')
 
-    args.large = True
+    args.large = False
+    args.skip_frames = 0
+    args.random_aug = 0.
 
     # Environment
     train_env = create_env(
         args.environment_filename,
         custom=True,
-        large=True,
-        skip_frames=2,
-        random_aug=0.4,
+        large=args.large,
+        skip_frames=args.skip_frames,
+        random_aug=args.random_aug,
         docker=args.docker_training,
         device=args.device
     )
@@ -93,9 +95,9 @@ def main():
     test_env = create_env(
         args.environment_filename,
         custom=True,
-        large=True,
+        large=args.large,
         custom_reward=False,
-        skip_frames=2,
+        skip_frames=args.skip_frames,
         docker=args.docker_training,
         device=args.device,
         worker_id=1,

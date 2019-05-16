@@ -91,13 +91,55 @@ def conv3x3(in_planes, out_planes, stride=1):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, drop_rate=0.0):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, drop_rate=0.0, batchnorm=False):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes, stride)
-        self.bn1 = nn.BatchNorm2d(planes)
+        self.bn1 = nn.BatchNorm2d(planes) if batchnorm else None
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
-        self.bn2 = nn.BatchNorm2d(planes)
+        self.bn2 = nn.BatchNorm2d(planes) if batchnorm else None
+        self.downsample = downsample
+        self.stride = stride
+        self.drop_rate = drop_rate
+        self.batchnorm = batchnorm
+
+    def forward(self, x):
+        residual = x
+
+        out = self.conv1(x)
+        if self.batchnorm:
+            out = self.bn1(out)
+        out = self.relu(out)
+
+        if self.drop_rate > 0.:
+            out = F.dropout(out, p=self.drop_rate, training=self.training)
+
+        out = self.conv2(out)
+        if self.batchnorm:
+            out = self.bn2(out)
+
+        if self.downsample is not None:
+            residual = self.downsample(x)
+
+        out += residual
+        out = self.relu(out)
+
+        return out
+
+
+class Bottleneck(nn.Module):
+    expansion = 2
+
+    def __init__(self, inplanes, planes, stride=1, downsample=None, drop_rate=0.0, batchnorm=False):
+        super(Bottleneck, self).__init__()
+        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes) if batchnorm else None
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
+                               padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes) if batchnorm else None
+        self.conv3 = nn.Conv2d(planes, planes * self.expansion, kernel_size=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(planes * self.expansion) if batchnorm else None
+        self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
         self.drop_rate = drop_rate
@@ -106,14 +148,21 @@ class BasicBlock(nn.Module):
         residual = x
 
         out = self.conv1(x)
-        out = self.bn1(out)
+        if self.bn1 is not None:
+            out = self.bn1(out)
         out = self.relu(out)
 
         if self.drop_rate > 0.:
             out = F.dropout(out, p=self.drop_rate, training=self.training)
 
         out = self.conv2(out)
-        out = self.bn2(out)
+        if self.bn2 is not None:
+            out = self.bn2(out)
+        out = self.relu(out)
+
+        out = self.conv3(out)
+        if self.bn3 is not None:
+            out = self.bn3(out)
 
         if self.downsample is not None:
             residual = self.downsample(x)
@@ -125,38 +174,33 @@ class BasicBlock(nn.Module):
 
 
 class ResDQN(nn.Module):
-    def __init__(self, args, action_space, act_fn=F.relu):
+    def __init__(self, args, action_space, act_fn=F.relu, batchnorm=False):
         super().__init__()
         self.atoms = args.atoms
         self.action_space = action_space
         self.act_fn = act_fn
         self.inplanes = 64
-        self.linear_size = 6400
+        self.linear_size = 6272
 
-        self.conv1 = nn.Conv2d(3, 32, 8, stride=4, padding=3)
+        self.conv1 = nn.Conv2d(3, 32, 8, stride=4, padding=1)
         self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
-        #self.conv3 = nn.Conv2d(64, 64, 4, stride=2)
-        #self.conv4 = nn.Conv2d(64, 64, 3)
-
-        self.layer1 = self._make_layer(BasicBlock, 64, 2, stride=1)
-        self.layer2 = self._make_layer(BasicBlock, 64, 2, stride=2)
-
+        self.layer1 = self._make_layer(Bottleneck, 64, 2, stride=2, batchnorm=batchnorm)
 
         self.fc_h_v = NoisyLinear(self.linear_size, args.hidden_size, std_init=args.noisy_std)
         self.fc_h_a = NoisyLinear(self.linear_size, args.hidden_size, std_init=args.noisy_std)
         self.fc_z_v = NoisyLinear(args.hidden_size, self.atoms, std_init=args.noisy_std)
         self.fc_z_a = NoisyLinear(args.hidden_size, action_space.n * self.atoms, std_init=args.noisy_std)
 
-    def _make_layer(self, block, planes, blocks, stride=1, drop_rate=0.):
+    def _make_layer(self, block, planes, blocks, stride=1, drop_rate=0., batchnorm=False):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion),
-            )
+            dl = [nn.Conv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False)]
+            if batchnorm:
+                dl += [nn.BatchNorm2d(planes * block.expansion)]
+            downsample = nn.Sequential(*dl)
 
-        layers = [block(self.inplanes, planes, stride, downsample, drop_rate)]
+        layers = [block(self.inplanes, planes, stride, downsample, drop_rate, batchnorm)]
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes))
@@ -167,7 +211,6 @@ class ResDQN(nn.Module):
         x = self.act_fn(self.conv1(x))
         x = self.act_fn(self.conv2(x))
         x = self.layer1(x)
-        x = self.layer2(x)
         x = x.view(-1, self.linear_size)
 
         v = self.fc_z_v(self.act_fn(self.fc_h_v(x)))  # Value stream

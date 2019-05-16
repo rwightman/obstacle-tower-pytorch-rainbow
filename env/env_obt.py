@@ -20,7 +20,7 @@ logger = logging.getLogger("gym_unity")
 
 
 class CustomObstacleTowerEnv(gym.Env):
-    ALLOWED_VERSIONS = ['1', '1.1', '1.2']
+    ALLOWED_VERSIONS = ['1', '1.1', '1.2', '1.3']
 
     def __init__(self, environment_filename=None, docker_training=False, worker_id=0, mode='retro',
                  timeout_wait=30, realtime_mode=False, custom_reward=False):
@@ -123,8 +123,8 @@ class CustomObstacleTowerEnv(gym.Env):
         elif self.mode == 'retro_large':
             image_space_max = 255
             image_space_dtype = np.uint8
-            camera_height = 168
-            camera_width = 168
+            camera_height = 126
+            camera_width = 126
 
         image_shape = (camera_height, camera_width, depth)
         image_space = spaces.Box(
