@@ -12,5 +12,6 @@ Moving forward, I was working on a PyTorch impl of R2D2 with the addition of nov
 * Setup a new Conda Python 3.6 environment (do not use 3.7! compatibility issues with Unity's support modules)
 * Install recent (ver 1.x) of PyTorch
 * Setup environment download engine as per: https://github.com/Unity-Technologies/obstacle-tower-challenge#local-setup-for-training but using this repo in place of that clone and do it within the same Conda env
+* Create a folder named 'results' to put in model and evaluation report
 * Run train_obt.py and wait...
 * run.py can be used to run the trained models for submission or for viewing with the `--realtime` flag set
